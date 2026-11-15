@@ -124,10 +124,11 @@ extension CameraManager: AVCapturePhotoCaptureDelegate {
 }
 extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        guard Date().timeIntervalSince(lastMoonCheck) > 0.45,
-              let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        lastMoonCheck = Date()
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        // Forward every camera frame to Metal; throttle only the more expensive Vision scene analysis.
         previewRenderer?.enqueue(pixelBuffer)
+        guard Date().timeIntervalSince(lastMoonCheck) > 0.45 else { return }
+        lastMoonCheck = Date()
         let request = VNClassifyImageRequest()
         do {
             try VNImageRequestHandler(cvPixelBuffer: pixelBuffer).perform([request])

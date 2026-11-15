@@ -38,7 +38,7 @@ The project currently targets iOS 17.0 or later. GitHub Actions builds the iOS S
 
 ## Open-source reference
 
-The editing controls and image-development architecture were informed by **[Lumen Camera](https://github.com/Irenapoghosian/lumen-camera)**, a Swift camera project that demonstrates a shared image-filter pipeline for live preview and full-resolution captures, adjustable filter intensity, and GPU rendering with Core Image/Metal. LUNARA currently implements its own post-capture AUTO/PRO pipeline; Lumen's live-rendering architecture is a reference for the planned real-time preview. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The editing controls and image-development architecture were informed by **[Lumen Camera](https://github.com/Irenapoghosian/lumen-camera)**, a Swift camera project that demonstrates a shared image-filter pipeline for live preview and full-resolution captures, adjustable filter intensity, and GPU rendering with Core Image/Metal. LUNARA now uses its own shared Core Image development graph for both Metal-rendered live frames and full-resolution stills. Lumen's architecture informed this implementation. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Contributions
 
@@ -46,7 +46,6 @@ Contributions are welcome. Please open an issue before large changes, include de
 
 ## Roadmap
 
-- Metal-backed live preview using the same Core Image development graph and settings as full-resolution captures.
 - Manual focus, shutter speed, ISO, exposure compensation, and white balance.
 - RAW/ProRAW capture where supported.
 - Dedicated astronomical moon detector and scene-aware exposure recommendations.

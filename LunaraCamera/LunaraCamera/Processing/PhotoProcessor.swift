@@ -47,8 +47,7 @@ struct PhotoAdjustments: Equatable {
 struct PhotoProcessor {
     private let context = CIContext(options: [.useSoftwareRenderer: false])
 
-    /// Develops the original capture at full resolution. The same pipeline is
-    /// used whenever the user changes a PRO control, avoiding destructive edits.
+    /// Still-photo entry point; it uses the same development graph as the Metal preview.
     func enhance(
         _ image: UIImage,
         scene: PhotoScene,
@@ -58,7 +57,20 @@ struct PhotoProcessor {
         adjustments: PhotoAdjustments = PhotoAdjustments()
     ) -> UIImage {
         guard let input = CIImage(image: image) else { return image }
+        let developed = develop(input, scene: scene, mode: mode, look: look, intensity: intensity, adjustments: adjustments)
+        guard let cgImage = context.createCGImage(developed, from: input.extent) else { return image }
+        return UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
+    }
 
+    /// Shared Core Image graph: identical scene, AUTO/PRO, look and adjustment parameters for preview and stills.
+    func develop(
+        _ input: CIImage,
+        scene: PhotoScene,
+        mode: PhotoEditMode = .auto,
+        look: PhotoLook = .natural,
+        intensity: Double = 0.55,
+        adjustments: PhotoAdjustments = PhotoAdjustments()
+    ) -> CIImage {
         var baseExposure: Float = 0.08
         var baseBrightness: Float = 0.015
         var baseContrast: Float = 1.06
@@ -68,58 +80,31 @@ struct PhotoProcessor {
 
         switch scene {
         case .moon:
-            baseExposure = -0.55
-            baseBrightness = -0.015
-            baseContrast = 1.18
-            baseSaturation = 0.90
-            baseVibrance = 0
-            baseSharpness = 0.35
+            baseExposure = -0.55; baseBrightness = -0.015; baseContrast = 1.18
+            baseSaturation = 0.90; baseVibrance = 0; baseSharpness = 0.35
         case .portrait:
-            baseExposure = 0.10
-            baseBrightness = 0.018
-            baseContrast = 1.04
-            baseSaturation = 1.04
-            baseVibrance = 0.12
-            baseSharpness = 0.10
+            baseExposure = 0.10; baseBrightness = 0.018; baseContrast = 1.04
+            baseSaturation = 1.04; baseVibrance = 0.12; baseSharpness = 0.10
         case .food:
-            baseExposure = 0.12
-            baseBrightness = 0.025
-            baseContrast = 1.07
-            baseSaturation = 1.08
-            baseVibrance = 0.18
-            baseSharpness = 0.14
+            baseExposure = 0.12; baseBrightness = 0.025; baseContrast = 1.07
+            baseSaturation = 1.08; baseVibrance = 0.18; baseSharpness = 0.14
         case .landscape:
-            baseExposure = 0.08
-            baseBrightness = 0.015
-            baseContrast = 1.10
-            baseSaturation = 1.07
-            baseVibrance = 0.16
-            baseSharpness = 0.18
+            baseExposure = 0.08; baseBrightness = 0.015; baseContrast = 1.10
+            baseSaturation = 1.07; baseVibrance = 0.16; baseSharpness = 0.18
         case .vehicle:
-            baseExposure = 0.06
-            baseBrightness = 0.010
-            baseContrast = 1.09
-            baseSaturation = 1.04
-            baseVibrance = 0.10
-            baseSharpness = 0.16
+            baseExposure = 0.06; baseBrightness = 0.010; baseContrast = 1.09
+            baseSaturation = 1.04; baseVibrance = 0.10; baseSharpness = 0.16
         case .document:
-            baseExposure = 0.12
-            baseBrightness = 0.025
-            baseContrast = 1.16
-            baseSaturation = 0.92
-            baseVibrance = 0
-            baseSharpness = 0.08
-        case .general:
-            break
+            baseExposure = 0.12; baseBrightness = 0.025; baseContrast = 1.16
+            baseSaturation = 0.92; baseVibrance = 0; baseSharpness = 0.08
+        case .general: break
         }
 
-        // AUTO applies the full scene recommendation. PRO keeps a gentler
-        // automatic baseline and lets the photographer take over.
         let automaticStrength: Float = mode == .auto ? 1.0 : 0.55
         let exposure = CIFilter.exposureAdjust()
         exposure.inputImage = input
         exposure.ev = baseExposure * automaticStrength + Float(adjustments.exposureEV)
-        guard let exposed = exposure.outputImage else { return image }
+        guard let exposed = exposure.outputImage else { return input }
 
         let vibrance = CIFilter.vibrance()
         vibrance.inputImage = exposed
@@ -131,7 +116,7 @@ struct PhotoProcessor {
         controls.brightness = baseBrightness * automaticStrength
         controls.contrast = 1 + (baseContrast - 1) * automaticStrength + Float(adjustments.contrast)
         controls.saturation = 1 + (baseSaturation - 1) * automaticStrength + Float(adjustments.saturation)
-        guard let colorAdjusted = controls.outputImage else { return image }
+        guard let colorAdjusted = controls.outputImage else { return input }
 
         let temperature = CIFilter.temperatureAndTint()
         temperature.inputImage = colorAdjusted
@@ -149,23 +134,16 @@ struct PhotoProcessor {
             dissolve.targetImage = styled
             dissolve.time = amount
             blended = dissolve.outputImage?.cropped(to: input.extent) ?? styled
-        } else {
-            blended = temperatureAdjusted
-        }
+        } else { blended = temperatureAdjusted }
 
         let sharpenAmount = min(max(baseSharpness * automaticStrength + Float(adjustments.sharpness), 0), 1)
-        let finalImage: CIImage
         if sharpenAmount > 0.001 {
             let sharpen = CIFilter.sharpenLuminance()
             sharpen.inputImage = blended
             sharpen.sharpness = sharpenAmount
-            finalImage = sharpen.outputImage?.cropped(to: input.extent) ?? blended
-        } else {
-            finalImage = blended
+            return sharpen.outputImage?.cropped(to: input.extent) ?? blended
         }
-
-        guard let cgImage = context.createCGImage(finalImage, from: input.extent) else { return image }
-        return UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
+        return blended
     }
 
     private func apply(look: PhotoLook, to image: CIImage) -> CIImage {

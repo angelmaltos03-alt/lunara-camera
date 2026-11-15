@@ -172,3 +172,116 @@ struct PhotoProcessor {
         }
     }
 }
+
+
+/// Local multi-frame lunar fusion. Frames are aligned to the sharpest reference that
+/// Vision can register; if registration is unreliable, the best single frame is returned.
+enum MoonStackProcessor {
+    struct Result {
+        let image: UIImage
+        let inputFrameCount: Int
+        let stackedFrameCount: Int
+        let usedFallback: Bool
+    }
+
+    static func process(_ images: [UIImage]) -> Result {
+        let usable = images.compactMap { image -> (UIImage, CGImage)? in
+            guard let cgImage = image.cgImage else { return nil }
+            return (image, cgImage)
+        }
+        guard let first = usable.first else {
+            return Result(image: UIImage(), inputFrameCount: images.count, stackedFrameCount: 0, usedFallback: true)
+        }
+        guard usable.count > 1 else {
+            return Result(image: first.0, inputFrameCount: images.count, stackedFrameCount: usable.count, usedFallback: true)
+        }
+
+        let context = CIContext(options: [.useSoftwareRenderer: false])
+        let ranked = usable.map { pair -> (UIImage, CGImage, Double) in
+            (pair.0, pair.1, sharpnessScore(pair.1, context: context))
+        }.sorted { $0.2 > $1.2 }
+
+        guard let reference = ranked.first,
+              reference.2 > 0.0001 else {
+            return Result(image: ranked[0].0, inputFrameCount: images.count, stackedFrameCount: 1, usedFallback: true)
+        }
+
+        let referenceImage = CIImage(cgImage: reference.1)
+        let extent = referenceImage.extent
+        var aligned = [referenceImage]
+        for candidate in ranked.dropFirst() {
+            let request = VNTranslationalImageRegistrationRequest(targetedCGImage: reference.1)
+            do {
+                try VNImageRequestHandler(cgImage: candidate.1).perform([request])
+                guard let observation = request.results?.first as? VNImageTranslationAlignmentObservation else { continue }
+                let transform = observation.alignmentTransform
+                // Reject extreme shifts; those are more likely unrelated framing or bad registration.
+                guard abs(transform.tx) < extent.width * 0.12,
+                      abs(transform.ty) < extent.height * 0.12 else { continue }
+                let transformed = CIImage(cgImage: candidate.1).transformed(by: transform)
+                aligned.append(transformed.cropped(to: extent))
+            } catch {
+                continue
+            }
+        }
+
+        guard aligned.count >= 2 else {
+            return Result(image: reference.0, inputFrameCount: images.count, stackedFrameCount: 1, usedFallback: true)
+        }
+
+        let weight = CGFloat(1.0 / Double(aligned.count))
+        let vector = CIVector(x: weight, y: 0, z: 0, w: 0)
+        let alpha = CIVector(x: 0, y: 0, z: 0, w: weight)
+        var sum: CIImage?
+        for frame in aligned {
+            let matrix = CIFilter.colorMatrix()
+            matrix.inputImage = frame
+            matrix.rVector = vector
+            matrix.gVector = CIVector(x: 0, y: weight, z: 0, w: 0)
+            matrix.bVector = CIVector(x: 0, y: 0, z: weight, w: 0)
+            matrix.aVector = alpha
+            guard let weighted = matrix.outputImage?.cropped(to: extent) else { continue }
+            if let current = sum {
+                let addition = CIFilter(name: "CIAdditionCompositing")
+                addition?.setValue(weighted, forKey: kCIInputImageKey)
+                addition?.setValue(current, forKey: kCIInputBackgroundImageKey)
+                sum = addition?.outputImage?.cropped(to: extent) ?? current
+            } else {
+                sum = weighted
+            }
+        }
+
+        guard let fused = sum,
+              let output = context.createCGImage(fused, from: extent) else {
+            return Result(image: reference.0, inputFrameCount: images.count, stackedFrameCount: 1, usedFallback: true)
+        }
+        return Result(
+            image: UIImage(cgImage: output, scale: reference.0.scale, orientation: reference.0.imageOrientation),
+            inputFrameCount: images.count,
+            stackedFrameCount: aligned.count,
+            usedFallback: false
+        )
+    }
+
+    private static func sharpnessScore(_ image: CGImage, context: CIContext) -> Double {
+        let source = CIImage(cgImage: image)
+        let edges = CIFilter.edges()
+        edges.inputImage = source
+        edges.intensity = 1.0
+        guard let edgeImage = edges.outputImage else { return 0 }
+        let average = CIFilter.areaAverage()
+        average.inputImage = edgeImage
+        average.extent = source.extent
+        guard let output = average.outputImage else { return 0 }
+        var pixel = [UInt8](repeating: 0, count: 4)
+        context.render(
+            output,
+            toBitmap: &pixel,
+            rowBytes: 4,
+            bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
+            format: .RGBA8,
+            colorSpace: CGColorSpaceCreateDeviceRGB()
+        )
+        return (Double(pixel[0]) + Double(pixel[1]) + Double(pixel[2])) / (3.0 * 255.0)
+    }
+}

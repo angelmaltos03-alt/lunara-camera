@@ -21,7 +21,7 @@ struct CameraScreen: View {
             if let original = camera.capturedImage {
                 reviewView(original: original)
             } else if camera.isAuthorized {
-                CameraPreview(session: camera.session).ignoresSafeArea()
+                CameraPreview(camera: camera, mode: editingMode, look: selectedLook, intensity: lookIntensity, adjustments: adjustments).ignoresSafeArea()
                 cameraOverlay
             } else {
                 permissionView

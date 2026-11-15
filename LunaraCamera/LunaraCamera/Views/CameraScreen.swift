@@ -322,7 +322,7 @@ struct CameraScreen: View {
         adjustments = PhotoAdjustments()
         showOriginal = false
         statusText = nil
-        process(image, mode: .auto, look: .natural, intensity: 0.55, adjustments: PhotoAdjustments())
+        process(image, scene: camera.isMoonModeEnabled ? .moon : nil, mode: .auto, look: .natural, intensity: 0.55, adjustments: PhotoAdjustments())
     }
 
     private func reprocessCaptured() {

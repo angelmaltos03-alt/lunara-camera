@@ -12,6 +12,8 @@ final class CameraManager: NSObject, ObservableObject {
     @Published var maximumZoom: CGFloat = 8.0
     @Published var isMoonDetected = false
     @Published var isMoonModeEnabled = false
+    @Published var previewScene: PhotoScene = .general
+    weak var previewRenderer: MetalCameraPreviewRenderer?
     let session = AVCaptureSession()
     private let photoOutput = AVCapturePhotoOutput()
     private let videoOutput = AVCaptureVideoDataOutput()
@@ -59,6 +61,7 @@ final class CameraManager: NSObject, ObservableObject {
             if self.session.canAddOutput(self.videoOutput) {
                 self.session.addOutput(self.videoOutput)
                 self.videoOutput.setSampleBufferDelegate(self, queue: self.visionQueue)
+                self.videoOutput.connection(with: .video)?.videoOrientation = .portrait
             }
             // Use the active device's reported zoom range, capped at 40x.
             let maxZoom = min(camera.activeFormat.videoMaxZoomFactor, 40.0)
@@ -124,12 +127,25 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
         guard Date().timeIntervalSince(lastMoonCheck) > 0.45,
               let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         lastMoonCheck = Date()
+        previewRenderer?.enqueue(pixelBuffer)
         let request = VNClassifyImageRequest()
         do {
             try VNImageRequestHandler(cvPixelBuffer: pixelBuffer).perform([request])
             let labels = (request.results ?? []).prefix(12).map { $0.identifier.lowercased() }
+            let text = labels.joined(separator: " ")
             let found = labels.contains { $0.contains("moon") || $0.contains("lunar") }
-            DispatchQueue.main.async { if self.isMoonDetected != found { self.isMoonDetected = found } }
+            let scene: PhotoScene
+            if found { scene = .moon }
+            else if ["food", "dish", "meal", "fruit", "vegetable"].contains(where: { text.contains($0) }) { scene = .food }
+            else if ["person", "face", "portrait", "man", "woman"].contains(where: { text.contains($0) }) { scene = .portrait }
+            else if ["car", "vehicle", "truck", "motorcycle", "automobile"].contains(where: { text.contains($0) }) { scene = .vehicle }
+            else if ["landscape", "tree", "mountain", "sky", "plant", "forest"].contains(where: { text.contains($0) }) { scene = .landscape }
+            else if ["document", "text", "paper", "book"].contains(where: { text.contains($0) }) { scene = .document }
+            else { scene = .general }
+            DispatchQueue.main.async {
+                self.isMoonDetected = found
+                self.previewScene = scene
+            }
         } catch { }
     }
 }

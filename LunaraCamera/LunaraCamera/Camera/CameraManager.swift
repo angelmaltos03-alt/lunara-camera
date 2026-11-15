@@ -11,6 +11,7 @@ final class CameraManager: NSObject, ObservableObject {
     @Published var zoomFactor: CGFloat = 1.0
     @Published var maximumZoom: CGFloat = 8.0
     @Published var isMoonDetected = false
+    @Published var isMoonModeEnabled = false
     let session = AVCaptureSession()
     private let photoOutput = AVCapturePhotoOutput()
     private let videoOutput = AVCaptureVideoDataOutput()
@@ -59,7 +60,8 @@ final class CameraManager: NSObject, ObservableObject {
                 self.session.addOutput(self.videoOutput)
                 self.videoOutput.setSampleBufferDelegate(self, queue: self.visionQueue)
             }
-            let maxZoom = min(camera.activeFormat.videoMaxZoomFactor, 12.0)
+            // Use the active device's reported zoom range, capped at 40x.
+            let maxZoom = min(camera.activeFormat.videoMaxZoomFactor, 40.0)
             DispatchQueue.main.async { self.maximumZoom = max(1.0, maxZoom) }
             self.configured = true; self.session.startRunning()
             DispatchQueue.main.async { self.isRunning = self.session.isRunning }
@@ -80,11 +82,14 @@ final class CameraManager: NSObject, ObservableObject {
     func capture() {
         sessionQueue.async {
             guard let camera = self.activeCamera else { return }
-            if self.isMoonDetected && camera.isExposureModeSupported(.custom) {
+            if (self.isMoonModeEnabled || self.isMoonDetected) && camera.isExposureModeSupported(.custom) {
                 do {
                     try camera.lockForConfiguration()
                     let minimumISO = camera.activeFormat.minISO
-                    camera.setExposureModeCustom(duration: CMTime(value: 1, timescale: 250), iso: minimumISO) { _ in self.capturePhotoNow() }
+                    let fastExposure = CMTime(value: 1, timescale: 500)
+                    let duration = CMTimeCompare(fastExposure, camera.activeFormat.minExposureDuration) < 0 ? camera.activeFormat.minExposureDuration : fastExposure
+                    if camera.isFocusModeSupported(.locked) { camera.setFocusModeLocked(lensPosition: 1.0, completionHandler: nil) }
+                    camera.setExposureModeCustom(duration: duration, iso: minimumISO) { _ in self.capturePhotoNow() }
                     camera.unlockForConfiguration()
                 } catch {
                     DispatchQueue.main.async { self.errorMessage = "No se pudo preparar la exposición lunar." }

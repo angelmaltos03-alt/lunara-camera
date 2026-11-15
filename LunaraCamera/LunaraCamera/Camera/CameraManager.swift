@@ -24,6 +24,7 @@ final class CameraManager: NSObject, ObservableObject {
     @Published var focusPosition: Double = 1.0
     @Published var whiteBalanceTemperature: Double = 5500
     @Published var manualControlsEnabled = false
+    @Published var moonStackSummary: String?
 
     weak var previewRenderer: MetalCameraPreviewRenderer?
     let session = AVCaptureSession()
@@ -34,6 +35,7 @@ final class CameraManager: NSObject, ObservableObject {
     private let sessionQueue = DispatchQueue(label: "lunaracamera.camera.session")
     private var configured = false
     private var activeCamera: AVCaptureDevice?
+    private var activeMoonBurstDelegates: [MoonBurstPhotoDelegate] = []
 
     func requestAccessAndConfigure() {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
@@ -223,6 +225,59 @@ final class CameraManager: NSObject, ObservableObject {
         }
     }
 
+    /// Captures a short burst for local lunar lucky-imaging and aligned averaging.
+    func captureMoonBurst() {
+        sessionQueue.async {
+            guard let camera = self.activeCamera else { return }
+            guard camera.isExposureModeSupported(.custom) else {
+                DispatchQueue.main.async { self.errorMessage = "Este dispositivo no permite exposición manual para el modo lunar." }
+                return
+            }
+            do {
+                try camera.lockForConfiguration()
+                if camera.isFocusModeSupported(.locked) {
+                    camera.setFocusModeLocked(lensPosition: 1.0, completionHandler: nil)
+                }
+                let seconds = max(CMTimeGetSeconds(camera.activeFormat.minExposureDuration), 1.0 / 500.0)
+                let iso = Double(camera.activeFormat.minISO)
+                let time = CMTimeMakeWithSeconds(seconds, preferredTimescale: 1_000_000_000)
+                camera.setExposureModeCustom(duration: time, iso: Float(iso)) { _ in
+                    self.sessionQueue.async { self.startMoonBurstCaptures(count: 7) }
+                }
+                camera.unlockForConfiguration()
+            } catch {
+                DispatchQueue.main.async { self.errorMessage = "No se pudo preparar la captura lunar." }
+            }
+        }
+    }
+
+    private func startMoonBurstCaptures(count: Int) {
+        let collector = MoonBurstCollector(expectedCount: count) { [weak self] images in
+            guard let self else { return }
+            DispatchQueue.global(qos: .userInitiated).async {
+                let result = MoonStackProcessor.process(images)
+                DispatchQueue.main.async {
+                    self.capturedImage = result.image
+                    self.moonStackSummary = result.usedFallback
+                        ? "Ráfaga de \(result.inputFrameCount) · se eligió el fotograma más nítido"
+                        : "Apiladas \(result.stackedFrameCount) de \(result.inputFrameCount) tomas · alineación local"
+                    self.activeMoonBurstDelegates.removeAll()
+                }
+            }
+        }
+
+        activeMoonBurstDelegates = (0..<count).map { _ in
+            MoonBurstPhotoDelegate { image in collector.receive(image) }
+        }
+        for delegate in activeMoonBurstDelegates {
+            let settings = AVCapturePhotoSettings()
+            settings.flashMode = .off
+            settings.isHighResolutionPhotoEnabled = true
+            settings.photoQualityPrioritization = .quality
+            photoOutput.capturePhoto(with: settings, delegate: delegate)
+        }
+    }
+
     private func capturePhotoNow() {
         let settings = AVCapturePhotoSettings()
         settings.flashMode = .off
@@ -277,5 +332,51 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
                 self.previewScene = scene
             }
         } catch { }
+    }
+}
+
+
+private final class MoonBurstPhotoDelegate: NSObject, AVCapturePhotoCaptureDelegate {
+    private let completion: (UIImage?) -> Void
+    private var capturedImage: UIImage?
+
+    init(completion: @escaping (UIImage?) -> Void) {
+        self.completion = completion
+    }
+
+    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+        guard error == nil,
+              let data = photo.fileDataRepresentation(),
+              let image = UIImage(data: data) else { return }
+        capturedImage = image
+    }
+
+    func photoOutput(_ output: AVCapturePhotoOutput, didFinishCaptureFor resolvedSettings: AVCaptureResolvedPhotoSettings, error: Error?) {
+        completion(error == nil ? capturedImage : nil)
+    }
+}
+
+private final class MoonBurstCollector {
+    private let lock = NSLock()
+    private let expectedCount: Int
+    private var completedCount = 0
+    private var images: [UIImage] = []
+    private let completion: ([UIImage]) -> Void
+
+    init(expectedCount: Int, completion: @escaping ([UIImage]) -> Void) {
+        self.expectedCount = expectedCount
+        self.completion = completion
+    }
+
+    func receive(_ image: UIImage?) {
+        var finishedImages: [UIImage]?
+        lock.lock()
+        if let image { images.append(image) }
+        completedCount += 1
+        if completedCount == expectedCount {
+            finishedImages = images
+        }
+        lock.unlock()
+        if let finishedImages { completion(finishedImages) }
     }
 }

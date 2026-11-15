@@ -65,6 +65,17 @@ struct CameraScreen: View {
 
             VStack(spacing: 8) {
                 HStack(spacing: 8) {
+                    Button {
+                        camera.isMoonModeEnabled.toggle()
+                        if camera.isMoonModeEnabled { camera.setZoom(min(max(camera.zoomFactor, 4.0), camera.maximumZoom)) }
+                    } label: {
+                        Label(camera.isMoonModeEnabled ? "MOON ON" : "MOON MODE", systemImage: "moon.stars.fill")
+                            .font(.system(size: 10, weight: .bold))
+                            .padding(.horizontal, 10).padding(.vertical, 7)
+                            .background(camera.isMoonModeEnabled ? Color.yellow.opacity(0.25) : Color.white.opacity(0.12), in: Capsule())
+                            .foregroundStyle(camera.isMoonModeEnabled ? .yellow : .white)
+                    }
+                    Spacer()
                     Image(systemName: "magnifyingglass")
                     Text(String(format: "ZOOM  %.1fx", Double(camera.zoomFactor)))
                     Spacer()
@@ -87,7 +98,7 @@ struct CameraScreen: View {
 
                 HStack(spacing: 8) {
                     Circle().fill(.mint).frame(width: 7, height: 7)
-                    Text("AUTO · ESCENA ADAPTATIVA")
+                    Text(camera.isMoonModeEnabled ? "EXPOSICIÓN LUNAR · ISO MÍNIMO" : "AUTO · ESCENA ADAPTATIVA")
                 }
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(0.8)
@@ -207,7 +218,7 @@ struct CameraScreen: View {
                         .padding(.vertical, 50)
                 }
 
-                Text("El original se conserva sin cambios. Los ajustes se aplican a una copia a resolución completa.")
+                Text("El original se conserva sin cambios. En modo lunar se prioriza una exposición corta y enfoque a infinito; el resultado depende de la óptica, estabilidad y luz disponibles. No se inventan cráteres.")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.55))
                     .multilineTextAlignment(.center)

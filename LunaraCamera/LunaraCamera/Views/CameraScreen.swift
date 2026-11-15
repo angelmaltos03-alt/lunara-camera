@@ -96,9 +96,64 @@ struct CameraScreen: View {
                 )
                 .tint(.mint)
 
+                Picker("Cámara", selection: $editingMode) {
+                    Text("AUTO").tag(PhotoEditMode.auto)
+                    Text("PRO").tag(PhotoEditMode.pro)
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: editingMode) { _, mode in
+                    camera.manualControlsEnabled = mode == .pro
+                }
+
+                if editingMode == .pro {
+                    VStack(alignment: .leading, spacing: 7) {
+                        HStack {
+                            Text("ISO")
+                            Spacer()
+                            Text("\(Int(camera.isoValue))").monospacedDigit()
+                        }
+                        Slider(value: Binding(
+                            get: { camera.isoValue },
+                            set: { camera.setManualExposure(seconds: camera.shutterSeconds, iso: $0) }
+                        ), in: camera.minimumISO...max(camera.minimumISO + 1, camera.maximumISO))
+
+                        HStack {
+                            Text("Obturación")
+                            Spacer()
+                            Text(String(format: "1/%.0f s", 1 / max(camera.shutterSeconds, 0.0001))).monospacedDigit()
+                        }
+                        Slider(value: Binding(
+                            get: { camera.shutterSeconds },
+                            set: { camera.setManualExposure(seconds: $0, iso: camera.isoValue) }
+                        ), in: camera.minimumShutterSeconds...max(camera.minimumShutterSeconds + 0.0001, camera.maximumShutterSeconds))
+
+                        HStack {
+                            Text("Enfoque manual")
+                            Spacer()
+                            Text(camera.focusPosition > 0.97 ? "Infinito" : String(format: "%.2f", camera.focusPosition)).monospacedDigit()
+                        }
+                        Slider(value: Binding(
+                            get: { camera.focusPosition },
+                            set: { camera.setManualFocus($0) }
+                        ), in: 0...1)
+
+                        HStack {
+                            Text("Balance de blancos")
+                            Spacer()
+                            Text("\(Int(camera.whiteBalanceTemperature)) K").monospacedDigit()
+                        }
+                        Slider(value: Binding(
+                            get: { camera.whiteBalanceTemperature },
+                            set: { camera.setWhiteBalance(temperature: $0) }
+                        ), in: 2500...9000)
+                    }
+                    .font(.caption.weight(.medium))
+                    .tint(.mint)
+                }
+
                 HStack(spacing: 8) {
                     Circle().fill(.mint).frame(width: 7, height: 7)
-                    Text(camera.isMoonModeEnabled ? "EXPOSICIÓN LUNAR · ISO MÍNIMO" : "AUTO · ESCENA ADAPTATIVA")
+                    Text(camera.isMoonModeEnabled ? "EXPOSICIÓN LUNAR · ISO MÍNIMO" : (editingMode == .pro ? "PRO · CONTROLES DEL SENSOR" : "AUTO · ESCENA ADAPTATIVA"))
                 }
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(0.8)

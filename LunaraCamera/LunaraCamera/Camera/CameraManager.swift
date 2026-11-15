@@ -11,6 +11,9 @@ final class CameraManager: NSObject, ObservableObject {
     @Published var zoomFactor: CGFloat = 1.0
     @Published var maximumZoom: CGFloat = 8.0
     @Published var isMoonDetected = false
+    @Published var isMoonModeEnabled = false
+    @Published var previewScene: PhotoScene = .general
+    weak var previewRenderer: MetalCameraPreviewRenderer?
     let session = AVCaptureSession()
     private let photoOutput = AVCapturePhotoOutput()
     private let videoOutput = AVCaptureVideoDataOutput()
@@ -58,8 +61,10 @@ final class CameraManager: NSObject, ObservableObject {
             if self.session.canAddOutput(self.videoOutput) {
                 self.session.addOutput(self.videoOutput)
                 self.videoOutput.setSampleBufferDelegate(self, queue: self.visionQueue)
+                self.videoOutput.connection(with: .video)?.videoOrientation = .portrait
             }
-            let maxZoom = min(camera.activeFormat.videoMaxZoomFactor, 12.0)
+            // Use the active device's reported zoom range, capped at 40x.
+            let maxZoom = min(camera.activeFormat.videoMaxZoomFactor, 40.0)
             DispatchQueue.main.async { self.maximumZoom = max(1.0, maxZoom) }
             self.configured = true; self.session.startRunning()
             DispatchQueue.main.async { self.isRunning = self.session.isRunning }
@@ -80,11 +85,14 @@ final class CameraManager: NSObject, ObservableObject {
     func capture() {
         sessionQueue.async {
             guard let camera = self.activeCamera else { return }
-            if self.isMoonDetected && camera.isExposureModeSupported(.custom) {
+            if (self.isMoonModeEnabled || self.isMoonDetected) && camera.isExposureModeSupported(.custom) {
                 do {
                     try camera.lockForConfiguration()
                     let minimumISO = camera.activeFormat.minISO
-                    camera.setExposureModeCustom(duration: CMTime(value: 1, timescale: 250), iso: minimumISO) { _ in self.capturePhotoNow() }
+                    let fastExposure = CMTime(value: 1, timescale: 500)
+                    let duration = CMTimeCompare(fastExposure, camera.activeFormat.minExposureDuration) < 0 ? camera.activeFormat.minExposureDuration : fastExposure
+                    if camera.isFocusModeSupported(.locked) { camera.setFocusModeLocked(lensPosition: 1.0, completionHandler: nil) }
+                    camera.setExposureModeCustom(duration: duration, iso: minimumISO) { _ in self.capturePhotoNow() }
                     camera.unlockForConfiguration()
                 } catch {
                     DispatchQueue.main.async { self.errorMessage = "No se pudo preparar la exposición lunar." }
@@ -116,15 +124,29 @@ extension CameraManager: AVCapturePhotoCaptureDelegate {
 }
 extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        guard Date().timeIntervalSince(lastMoonCheck) > 0.45,
-              let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        // Forward every camera frame to Metal; throttle only the more expensive Vision scene analysis.
+        previewRenderer?.enqueue(pixelBuffer)
+        guard Date().timeIntervalSince(lastMoonCheck) > 0.45 else { return }
         lastMoonCheck = Date()
         let request = VNClassifyImageRequest()
         do {
             try VNImageRequestHandler(cvPixelBuffer: pixelBuffer).perform([request])
             let labels = (request.results ?? []).prefix(12).map { $0.identifier.lowercased() }
+            let text = labels.joined(separator: " ")
             let found = labels.contains { $0.contains("moon") || $0.contains("lunar") }
-            DispatchQueue.main.async { if self.isMoonDetected != found { self.isMoonDetected = found } }
+            let scene: PhotoScene
+            if found { scene = .moon }
+            else if ["food", "dish", "meal", "fruit", "vegetable"].contains(where: { text.contains($0) }) { scene = .food }
+            else if ["person", "face", "portrait", "man", "woman"].contains(where: { text.contains($0) }) { scene = .portrait }
+            else if ["car", "vehicle", "truck", "motorcycle", "automobile"].contains(where: { text.contains($0) }) { scene = .vehicle }
+            else if ["landscape", "tree", "mountain", "sky", "plant", "forest"].contains(where: { text.contains($0) }) { scene = .landscape }
+            else if ["document", "text", "paper", "book"].contains(where: { text.contains($0) }) { scene = .document }
+            else { scene = .general }
+            DispatchQueue.main.async {
+                self.isMoonDetected = found
+                self.previewScene = scene
+            }
         } catch { }
     }
 }

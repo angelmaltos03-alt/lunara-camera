@@ -26,7 +26,7 @@ struct CameraPreview: UIViewRepresentable {
         view.backgroundColor = .black
 
         let renderer = MetalCameraPreviewRenderer(device: device)
-        renderer.update(mode: mode, look: look, intensity: intensity, adjustments: adjustments, scene: camera.previewScene)
+        renderer.update(mode: mode, look: look, intensity: intensity, adjustments: adjustments, scene: camera.isMoonModeEnabled ? .moon : camera.previewScene)
         view.delegate = renderer
         context.coordinator.renderer = renderer
         camera.previewRenderer = renderer

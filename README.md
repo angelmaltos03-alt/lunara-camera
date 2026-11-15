@@ -11,7 +11,7 @@ LUNARA is an experimental native iOS camera focused on natural, adaptive computa
 - On-device Vision classification for scene recognition and live moon-candidate detection.
 - Scene-aware Core Image development for portraits, food, landscapes, vehicles, documents, general scenes, and moon captures.
 - **AUTO mode:** conservative corrections based on the detected scene.
-- **PRO mode:** manual exposure, contrast, saturation, temperature, and definition controls.
+- **PRO mode:** live hardware-aware ISO, shutter speed, manual lens focus, and white-balance temperature controls, plus non-destructive image-development adjustments (contrast, saturation, warmth, definition). Values are clamped to the active camera format's reported limits.
 - Creative looks: Natural, Vivid, Warm, Cool, and Mono, with adjustable intensity.
 - Original/processed comparison and saving the optimized copy to Photos.
 - Zoom slider using the active camera device's reported range (capped at 40x; actual range depends on hardware and active format).

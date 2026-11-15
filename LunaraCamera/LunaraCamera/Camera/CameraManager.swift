@@ -120,7 +120,6 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
               let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         lastMoonCheck = Date()
         let request = VNClassifyImageRequest()
-        request.imageCropAndScaleOption = .centerCrop
         do {
             try VNImageRequestHandler(cvPixelBuffer: pixelBuffer).perform([request])
             let labels = (request.results ?? []).prefix(12).map { $0.identifier.lowercased() }

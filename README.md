@@ -22,7 +22,7 @@ LUNARA is an experimental native iOS camera focused on natural, adaptive computa
 
 The original capture is kept unchanged. LUNARA re-runs its development pipeline from that original whenever a user changes an editing control, avoiding cumulative edits and quality loss from repeatedly processing an already processed copy.
 
-The current AUTO/PRO controls are applied **after the shutter is pressed** to the full-resolution still image. The live viewfinder is not yet rendered through the creative looks. A GPU-rendered live preview that matches the final capture is a planned next stage.
+The live viewfinder is rendered with Metal and runs through the same Core Image development graph as the full-resolution still. Scene classification is updated periodically from preview frames; the still is independently analyzed after capture, so scene classification can occasionally differ. The preview is a real-time approximation at video-frame resolution, while the saved image uses the full-resolution photo sensor output.
 
 Moon detection is best-effort Vision classification, not a guaranteed astronomical detector. The current lunar pipeline applies conservative exposure, contrast, and sharpening only to information actually present in the capture. It does **not** synthesize craters or claim digital zoom creates optical detail.
 
@@ -46,7 +46,7 @@ Contributions are welcome. Please open an issue before large changes, include de
 
 ## Roadmap
 
-- GPU-rendered live preview with the same filter engine used for captured photos.
+- Metal-backed live preview using the same Core Image development graph and settings as full-resolution captures.
 - Manual focus, shutter speed, ISO, exposure compensation, and white balance.
 - RAW/ProRAW capture where supported.
 - Dedicated astronomical moon detector and scene-aware exposure recommendations.

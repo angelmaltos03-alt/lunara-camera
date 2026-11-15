@@ -1,6 +1,7 @@
 import CoreImage
 import CoreImage.CIFilterBuiltins
 import UIKit
+import Vision
 
 enum PhotoEditMode: String, CaseIterable, Identifiable {
     case auto

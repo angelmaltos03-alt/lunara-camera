@@ -14,7 +14,8 @@ LUNARA is an experimental native iOS camera focused on natural, adaptive computa
 - **PRO mode:** manual exposure, contrast, saturation, temperature, and definition controls.
 - Creative looks: Natural, Vivid, Warm, Cool, and Mono, with adjustable intensity.
 - Original/processed comparison and saving the optimized copy to Photos.
-- Zoom slider using the selected camera device's supported zoom range (capped at 12x in this prototype).
+- Zoom slider using the active camera device's reported range (capped at 40x; actual range depends on hardware and active format).
+- Dedicated Moon Mode with minimum-ISO, short-exposure capture and infinity-focus lock where supported.
 - MIT license.
 
 ## Editing behavior and limits
@@ -48,8 +49,8 @@ Contributions are welcome. Please open an issue before large changes, include de
 - GPU-rendered live preview with the same filter engine used for captured photos.
 - Manual focus, shutter speed, ISO, exposure compensation, and white balance.
 - RAW/ProRAW capture where supported.
-- Better moon detection and exposure recommendations.
-- Burst capture and aligned multi-frame lunar stacking.
+- Dedicated astronomical moon detector and scene-aware exposure recommendations.
+- Burst capture and aligned multi-frame lunar stacking (not yet implemented).
 - Automated tests and a physical-device compatibility matrix.
 - Optional cloud enhancement adapter with explicit per-image consent and secure server-side secrets.
 

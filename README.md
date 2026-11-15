@@ -1,5 +1,7 @@
 # LUNARA — Open Source Computational Photography
 
+[![iOS build](https://github.com/angelmaltos03-alt/lunara-camera/actions/workflows/ios-build.yml/badge.svg)](https://github.com/angelmaltos03-alt/lunara-camera/actions/workflows/ios-build.yml)
+
 LUNARA is an experimental native iOS camera project focused on adaptive computational photography. Ordinary photo development runs on-device. Optional cloud-assisted processing is planned as an explicit, consent-based extension.
 
 ## Current MVP
@@ -23,7 +25,7 @@ For better moon photos, use a telephoto lens when available, stabilize the phone
 4. Change the bundle identifier if needed for your own build.
 5. Run. Camera access is required.
 
-The project currently targets iOS 17.0 or later. It has not yet been compiled or tested on a physical device in this environment.
+The project currently targets iOS 17.0 or later. The GitHub Actions workflow builds the iOS Simulator target on macOS; a successful simulator build does not replace testing on a physical iPhone.
 
 ## Contributions
 Contributions are welcome. Please open an issue before large changes, include device/iOS details for camera bugs, and never commit API keys, signing certificates, personal photos, or private credentials.

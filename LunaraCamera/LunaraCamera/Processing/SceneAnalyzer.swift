@@ -15,7 +15,6 @@ struct SceneAnalyzer {
     func detect(in image: UIImage) -> PhotoScene {
         guard let cgImage = image.cgImage else { return .general }
         let request = VNClassifyImageRequest()
-        request.imageCropAndScaleOption = .centerCrop
         do {
             try VNImageRequestHandler(cgImage: cgImage).perform([request])
             let labels = (request.results ?? []).prefix(8).map { $0.identifier.lowercased() }

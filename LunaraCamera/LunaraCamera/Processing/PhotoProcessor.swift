@@ -136,7 +136,7 @@ struct PhotoProcessor {
         let temperature = CIFilter.temperatureAndTint()
         temperature.inputImage = colorAdjusted
         temperature.neutral = CIVector(x: 6500, y: 0)
-        let warmShift = (scene == .food ? 120 : 0) + adjustments.warmth * 1500
+        let warmShift = CGFloat(scene == .food ? 120 : 0) + CGFloat(adjustments.warmth * 1500)
         temperature.targetNeutral = CIVector(x: 6500 - warmShift, y: 0)
         let temperatureAdjusted = temperature.outputImage ?? colorAdjusted
 

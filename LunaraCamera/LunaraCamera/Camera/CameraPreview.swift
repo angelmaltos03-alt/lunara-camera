@@ -14,10 +14,10 @@ struct CameraPreview: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> MTKView {
-        guard let device = MTLCreateSystemDefaultDevice(),
-              let view = MTKView(frame: .zero, device: device) as MTKView? else {
+        guard let device = MTLCreateSystemDefaultDevice() else {
             return MTKView(frame: .zero, device: nil)
         }
+        let view = MTKView(frame: .zero, device: device)
         view.colorPixelFormat = .bgra8Unorm
         view.framebufferOnly = false
         view.isPaused = false

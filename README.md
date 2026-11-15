@@ -15,7 +15,8 @@ LUNARA is an experimental native iOS camera focused on natural, adaptive computa
 - Creative looks: Natural, Vivid, Warm, Cool, and Mono, with adjustable intensity.
 - Original/processed comparison and saving the optimized copy to Photos.
 - Zoom slider using the active camera device's reported range (capped at 40x; actual range depends on hardware and active format).
-- Dedicated Moon Mode with minimum-ISO, short-exposure capture and infinity-focus lock where supported.
+- Dedicated Moon Mode with a seven-frame high-resolution burst, minimum-ISO short exposures, and infinity-focus lock where supported.
+- On-device lunar frame scoring using an edge-detail metric, Vision translational registration against the sharpest reference, and aligned weighted averaging. If registration is insufficient, LUNARA falls back to the sharpest single frame.
 - MIT license.
 
 ## Editing behavior and limits
@@ -24,7 +25,7 @@ The original capture is kept unchanged. LUNARA re-runs its development pipeline 
 
 The live viewfinder is rendered with Metal and runs through the same Core Image development graph as the full-resolution still. Scene classification is updated periodically from preview frames; the still is independently analyzed after capture, so scene classification can occasionally differ. The preview is a real-time approximation at video-frame resolution, while the saved image uses the full-resolution photo sensor output.
 
-Moon detection is best-effort Vision classification, not a guaranteed astronomical detector. The current lunar pipeline applies conservative exposure, contrast, and sharpening only to information actually present in the capture. It does **not** synthesize craters or claim digital zoom creates optical detail.
+Moon detection is best-effort Vision classification, not a guaranteed astronomical detector. Moon Mode captures seven frames with a short, hardware-bounded exposure and minimum ISO, scores detail, aligns frames with Vision translational registration, and averages only successfully registered frames. If fewer than two frames can be aligned, it falls back to the sharpest source frame. This is a first-generation local stacker: motion, clouds, atmospheric turbulence, exposure drift, and camera shake can still reduce quality. It does **not** synthesize craters or claim digital zoom creates optical detail.
 
 ## Build
 

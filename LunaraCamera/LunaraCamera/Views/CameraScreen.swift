@@ -170,7 +170,7 @@ struct CameraScreen: View {
                     .frame(width: 54, height: 54)
                     .foregroundStyle(.white.opacity(0.4))
                 Spacer()
-                Button { camera.capture() } label: {
+                Button { camera.isMoonModeEnabled ? camera.captureMoonBurst() : camera.capture() } label: {
                     Circle()
                         .stroke(.white, lineWidth: 5)
                         .frame(width: 76, height: 76)
@@ -213,6 +213,7 @@ struct CameraScreen: View {
                         camera.capturedImage = nil
                         enhancedImage = nil
                         statusText = nil
+                        camera.moonStackSummary = nil
                     }
                     Spacer()
                     Text("RESULTADO LUNARA")
@@ -262,6 +263,12 @@ struct CameraScreen: View {
                     .buttonStyle(.borderedProminent)
                     .tint(.mint)
 
+                    if let moonStackSummary = camera.moonStackSummary {
+                        Text(moonStackSummary)
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.mint)
+                    }
+
                     if let statusText {
                         Text(statusText)
                             .font(.footnote)
@@ -273,7 +280,7 @@ struct CameraScreen: View {
                         .padding(.vertical, 50)
                 }
 
-                Text("El original se conserva sin cambios. En modo lunar se prioriza una exposición corta y enfoque a infinito; el resultado depende de la óptica, estabilidad y luz disponibles. No se inventan cráteres.")
+                Text("En modo lunar se capturan hasta siete fotogramas con exposición corta e ISO mínimo. LUNARA puntúa nitidez, alinea los fotogramas registrables y promedia la información coincidente. Si la alineación falla, conserva la toma más nítida. No se inventan cráteres.")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.55))
                     .multilineTextAlignment(.center)

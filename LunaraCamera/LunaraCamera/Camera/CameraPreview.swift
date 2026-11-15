@@ -36,7 +36,7 @@ struct CameraPreview: UIViewRepresentable {
     func updateUIView(_ uiView: MTKView, context: Context) {
         context.coordinator.renderer?.update(
             mode: mode, look: look, intensity: intensity,
-            adjustments: adjustments, scene: camera.previewScene
+            adjustments: adjustments, scene: camera.isMoonModeEnabled ? .moon : camera.previewScene
         )
         camera.previewRenderer = context.coordinator.renderer
     }
